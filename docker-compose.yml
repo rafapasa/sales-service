@@ -2,28 +2,54 @@ version: '3.8'
 
 services:
   mongodb:
-    image: mongo:7.0
-    container_name: mongodb_container
-    restart: unless-stopped
+    image: mongo:6.0
+    container_name: gopherstore-mongodb
     ports:
       - "27017:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: admin123
-      MONGO_INITDB_DATABASE: meu_banco
+      MONGO_INITDB_ROOT_PASSWORD: adminpassword
+      MONGO_INITDB_DATABASE: sales_db
     volumes:
       - mongodb_data:/data/db
-      - mongodb_config:/data/configdb
     networks:
-      - mongodb_network
+      - gopherstore-network
+
+  mysql:
+    image: mysql:8.0
+    container_name: gopherstore-mysql
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: payment_db
+      MYSQL_USER: payment_user
+      MYSQL_PASSWORD: payment_password
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - gopherstore-network
+    command: --default-authentication-plugin=mysql_native_password
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: gopherstore-rabbitmq
+    ports:
+      - "5672:5672"     # Porta do protocolo AMQP (para a aplicação Go se conectar)
+      - "15672:15672"   # Painel de Controle Web do RabbitMQ (Management UI)
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - gopherstore-network
 
 volumes:
   mongodb_data:
-    name: mongodb_data
-  mongodb_config:
-    name: mongodb_config
+  mysql_data:
+  rabbitmq_data:
 
 networks:
-  mongodb_network:
-    name: mongodb_network
+  gopherstore-network:
     driver: bridge

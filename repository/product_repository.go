@@ -5,6 +5,7 @@ import (
 
 	"github.com/rafapasa/sales-service/models"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -41,7 +42,7 @@ func (r *ProductRepository) GetAll() ([]*models.Product, error) {
 	return products, nil
 }
 
-func (r *ProductRepository) GetByID(id string) (*models.Product, error) {
+func (r *ProductRepository) GetByID(id primitive.ObjectID) (*models.Product, error) {
 	var product models.Product
 	err := r.collection.FindOne(context.Background(), bson.M{"_id": id}).Decode(&product)
 	if err != nil {
@@ -50,12 +51,12 @@ func (r *ProductRepository) GetByID(id string) (*models.Product, error) {
 	return &product, nil
 }
 
-func (r *ProductRepository) Update(id string, product *models.Product) error {
+func (r *ProductRepository) Update(id primitive.ObjectID, product *models.Product) error {
 	_, err := r.collection.UpdateOne(context.Background(), bson.M{"_id": id}, bson.M{"$set": product})
 	return err
 }
 
-func (r *ProductRepository) Delete(id string) error {
+func (r *ProductRepository) Delete(id primitive.ObjectID) error {
 	_, err := r.collection.DeleteOne(context.Background(), bson.M{"_id": id})
 	return err
 }

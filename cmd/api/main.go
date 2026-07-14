@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -15,6 +16,9 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/rafapasa/sales-service/config"
 	"github.com/rafapasa/sales-service/database"
+	"github.com/rafapasa/sales-service/handlers"
+	"github.com/rafapasa/sales-service/repository"
+	"github.com/rafapasa/sales-service/services"
 )
 
 func main() {
@@ -27,17 +31,24 @@ func main() {
 	cfg := config.NewConfig()
 
 	// Conectar ao MongoDB
-	// db, err := database.ConnectDB(cfg.MongoDBURI, cfg.MongoDBDatabase)
-	_, err := database.ConnectDB(cfg.MongoDBURI, cfg.MongoDBDatabase)
+	db, err := database.ConnectDB(cfg.MongoDBURI, cfg.MongoDBDatabase)
 	if err != nil {
 		log.Fatalf("Erro ao conectar ao MongoDB: %v", err)
 	}
 	defer database.CloseDB()
 
 	// Inicializar dependências
-	// userRepo := repositories.NewUserRepository(db)
-	// userService := services.NewUserService(userRepo)
-	// userHandler := handlers.NewUserHandler(userService)
+	customerRepo := repository.NewCustomerRepository(db)
+	customerService := services.NewCustomerService(customerRepo)
+	customerHandler := handlers.NewCustomerHandler(customerService)
+
+	productRepo := repository.NewProductRepository(db)
+	productService := services.NewProductService(productRepo)
+	productHandler := handlers.NewProductHandler(productService)
+
+	orderRepo := repository.NewOrderRepository(db)
+	orderService := services.NewOrderService(orderRepo)
+	orderHandler := handlers.NewOrderHandler(orderService)
 
 	// Configurar rotas
 
@@ -86,12 +97,32 @@ func main() {
 	api.Get("/ping", func(c *fiber.Ctx) error {
 		return c.SendString("pong")
 	})
-	// Rotas de usuário
-	// api.Post("/users", userHandler.CreateUser)
-	// api.Get("/users", userHandler.GetAllUsers)
-	// api.Get("/users/:id", userHandler.GetUserByID)
-	// api.Put("/users/:id", userHandler.UpdateUser)
-	// api.Delete("/users/:id", userHandler.DeleteUser)
+	// Rotas de Cliente
+	api.Post("/customers", customerHandler.CreateCustomer)
+	api.Get("/customers", customerHandler.GetAllCustomers)
+	api.Get("/customers/:id", customerHandler.GetCustomerByID)
+	api.Put("/customers/:id", customerHandler.UpdateCustomer)
+	api.Delete("/customers/:id", customerHandler.DeleteCustomer)
+
+	// Rotas de Produto
+	api.Post("/products", productHandler.CreateProduct)
+	api.Get("/products", productHandler.GetAllProducts)
+	api.Get("/products/:id", productHandler.GetProductByID)
+	api.Put("/products/:id", productHandler.UpdateProduct)
+	api.Delete("/products/:id", productHandler.DeleteProduct)
+
+	// Rotas de Pedido
+	api.Post("/orders", orderHandler.CreateOrder)
+	api.Get("/orders", orderHandler.GetAllOrders)
+	api.Get("/orders/:id", orderHandler.GetOrderByID)
+
+	// Iniciar servidor em goroutine
+	go func() {
+		log.Printf("🚀 Servidor Fiber iniciado na porta %s", cfg.ServerPort)
+		if err := app.Listen(fmt.Sprintf(":%s", cfg.ServerPort)); err != nil {
+			log.Fatalf("Erro ao iniciar servidor: %v", err)
+		}
+	}()
 
 	// Graceful shutdown
 	quit := make(chan os.Signal, 1)
