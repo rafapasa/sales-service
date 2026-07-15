@@ -2,10 +2,8 @@ package services
 
 import (
 	"context"
-	"errors"
 	"log"
 
-	"github.com/rafapasa/sales-service/internal/domain/events"
 	"github.com/rafapasa/sales-service/internal/domain/models"
 	"github.com/rafapasa/sales-service/internal/infrastructure/database"
 	"github.com/rafapasa/sales-service/internal/infrastructure/messaging"
@@ -22,59 +20,31 @@ func NewOrderService(repo *database.OrderRepository, publisher *messaging.Rabbit
 		publisher: publisher}
 }
 
-func (s *OrderService) CreateOrder(ctx context.Context, req *models.Order) (*models.Order, error) {
-	// 1. Validações de negócio
-	if req.Total <= 0 {
-		return nil, errors.New("total amount must be greater than zero")
-	}
-
-	// 2. Salvar no MongoDB
-	if err := s.repo.Create(req); err != nil {
-		return nil, err
-	}
-
-	// Convert models.OrderItem to domainevents.OrderItem
-	var eventItems []events.OrderItem
-	for _, item := range req.Items {
-		eventItems = append(eventItems, events.OrderItem{
-			ProductID: item.Product.Id.String(),
-			Quantity:  item.Quantity,
-			Price:     item.Price,
-		})
-	}
-
-	// 3. PUBLICAR EVENTO (NOSSO FOCO!)
-	event := events.NewOrderCreatedEvent(
-		req.Id.String(),
-		req.Customer.Id.String(),
-		req.Total,
-		eventItems,
-	)
+// EnqueueOrder apenas publica o pedido recebido para processamento assíncrono.
+func (s *OrderService) EnqueueOrder(ctx context.Context, order *models.Order) (string, error) {
+	const eventType = "order.received.v1"
 
 	// Criar envelope
-	envelope, err := messaging.NewMessageEnvelope(events.EventOrderCreated, event)
+	envelope, err := messaging.NewMessageEnvelope(eventType, order)
 	if err != nil {
 		log.Printf("❌ Erro ao criar envelope: %v", err)
-		// Não falha a operação, apenas loga
-		return req, nil
+		return "", err
 	}
 
 	// Publicar no RabbitMQ
 	body, err := envelope.ToJSON()
 	if err != nil {
 		log.Printf("❌ Erro ao serializar evento: %v", err)
-		return req, nil
+		return "", err
 	}
 
-	if err := s.publisher.Publish(ctx, events.EventOrderCreated, body); err != nil {
+	if err := s.publisher.Publish(ctx, eventType, body); err != nil {
 		log.Printf("❌ Erro ao publicar evento: %v", err)
-		// Não falha a operação, mas DEVERÍAMOS salvar no OUTBOX
-		return req, nil
+		return "", err
 	}
 
-	log.Printf("✅ Evento publicado: %s", events.EventOrderCreated)
-
-	return req, nil
+	log.Printf("✅ Pedido enfileirado para processamento. CorrelationID: %s", envelope.CorrelationID)
+	return envelope.CorrelationID, nil
 }
 
 func (s *OrderService) GetAllOrders() ([]*models.Order, error) {

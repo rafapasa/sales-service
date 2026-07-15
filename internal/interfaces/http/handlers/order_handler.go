@@ -4,9 +4,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/rafapasa/sales-service/internal/application/services"
 	"github.com/rafapasa/sales-service/internal/domain/models"
-
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type OrderHandler struct {
@@ -18,67 +16,37 @@ func NewOrderHandler(service *services.OrderService) *OrderHandler {
 }
 
 func (h *OrderHandler) CreateOrder(c *fiber.Ctx) error {
-	var order models.Order
-	if err := c.BodyParser(&order); err != nil {
+	var req models.Order
+	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "cannot parse JSON"})
 	}
-	order.Id = primitive.NewObjectID()
 
-	if _, err := h.service.CreateOrder(c.Context(), &order); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not create order"})
+	// A lógica agora é apenas enfileirar o pedido
+	correlationID, err := h.service.EnqueueOrder(c.Context(), &req)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
-	return c.Status(fiber.StatusCreated).JSON(order)
+
+	// Retorna 202 Accepted com um ID para rastreamento
+	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{
+		"message":        "Order received and is being processed",
+		"correlation_id": correlationID,
+	})
 }
 
 func (h *OrderHandler) GetAllOrders(c *fiber.Ctx) error {
 	orders, err := h.service.GetAllOrders()
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not fetch orders"})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.JSON(orders)
 }
 
 func (h *OrderHandler) GetOrderByID(c *fiber.Ctx) error {
-	id, err := primitive.ObjectIDFromHex(c.Params("id"))
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid ID format"})
-	}
-
+	id, _ := primitive.ObjectIDFromHex(c.Params("id"))
 	order, err := h.service.GetOrderByID(id)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "order not found"})
-		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not fetch order"})
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "order not found"})
 	}
 	return c.JSON(order)
-}
-
-func (h *OrderHandler) UpdateOrder(c *fiber.Ctx) error {
-	id, err := primitive.ObjectIDFromHex(c.Params("id"))
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid ID format"})
-	}
-
-	var order models.Order
-	if err := c.BodyParser(&order); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "cannot parse JSON"})
-	}
-
-	if err := h.service.UpdateOrder(id, &order); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not update order"})
-	}
-	return c.SendStatus(fiber.StatusNoContent)
-}
-
-func (h *OrderHandler) DeleteOrder(c *fiber.Ctx) error {
-	id, err := primitive.ObjectIDFromHex(c.Params("id"))
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid ID format"})
-	}
-
-	if err := h.service.DeleteOrder(id); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not delete order"})
-	}
-	return c.SendStatus(fiber.StatusNoContent)
 }
