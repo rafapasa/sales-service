@@ -2,17 +2,18 @@ package handlers
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/rafapasa/sales-service/models"
-	service "github.com/rafapasa/sales-service/services"
+	"github.com/rafapasa/sales-service/internal/application/services"
+	"github.com/rafapasa/sales-service/internal/domain/models"
+
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type ProductHandler struct {
-	service *service.ProductService
+	service *services.ProductService
 }
 
-func NewProductHandler(service *service.ProductService) *ProductHandler {
+func NewProductHandler(service *services.ProductService) *ProductHandler {
 	return &ProductHandler{service: service}
 }
 

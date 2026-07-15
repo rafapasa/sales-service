@@ -3,9 +3,8 @@ module github.com/rafapasa/sales-service
 go 1.25.1
 
 require (
-	github.com/gorilla/mux v1.8.1
 	github.com/joho/godotenv v1.5.1
-	github.com/rs/cors v1.11.1
+	github.com/rabbitmq/amqp091-go v1.12.0
 )
 
 require (
@@ -23,17 +22,14 @@ require (
 require (
 	github.com/andybalholm/brotli v1.2.2 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
-	github.com/gofiber/fiber/v2 v2.52.14 // indirect
-	github.com/google/uuid v1.6.0 // indirect
+	github.com/gofiber/fiber/v2 v2.52.14
+	github.com/google/uuid v1.6.0
 	github.com/klauspost/compress v1.19.0 // indirect
 	github.com/mattn/go-colorable v0.1.15 // indirect
 	github.com/mattn/go-isatty v0.0.22 // indirect
 	github.com/mattn/go-runewidth v0.0.24 // indirect
-	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.72.0 // indirect
-	github.com/valyala/tcplisten v1.0.0 // indirect
 	go.mongodb.org/mongo-driver v1.17.9
 	golang.org/x/sys v0.47.0 // indirect
-	gorm.io/gorm v1.31.2
 )

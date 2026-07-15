@@ -1,9 +1,9 @@
-package repository
+package database
 
 import (
 	"context"
 
-	"github.com/rafapasa/sales-service/models"
+	"github.com/rafapasa/sales-service/internal/domain/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"

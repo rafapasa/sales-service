@@ -1,16 +1,16 @@
 package services
 
 import (
-	"github.com/rafapasa/sales-service/models"
-	"github.com/rafapasa/sales-service/repository"
+	"github.com/rafapasa/sales-service/internal/domain/models"
+	"github.com/rafapasa/sales-service/internal/infrastructure/database"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type CustomerService struct {
-	repo *repository.CustomerRepository
+	repo *database.CustomerRepository
 }
 
-func NewCustomerService(repo *repository.CustomerRepository) *CustomerService {
+func NewCustomerService(repo *database.CustomerRepository) *CustomerService {
 	return &CustomerService{repo: repo}
 }
 

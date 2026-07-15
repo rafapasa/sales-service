@@ -2,17 +2,18 @@ package handlers
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/rafapasa/sales-service/models"
-	service "github.com/rafapasa/sales-service/services"
+	"github.com/rafapasa/sales-service/internal/application/services"
+	"github.com/rafapasa/sales-service/internal/domain/models"
+
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type OrderHandler struct {
-	service *service.OrderService
+	service *services.OrderService
 }
 
-func NewOrderHandler(service *service.OrderService) *OrderHandler {
+func NewOrderHandler(service *services.OrderService) *OrderHandler {
 	return &OrderHandler{service: service}
 }
 
@@ -23,7 +24,7 @@ func (h *OrderHandler) CreateOrder(c *fiber.Ctx) error {
 	}
 	order.Id = primitive.NewObjectID()
 
-	if err := h.service.CreateOrder(&order); err != nil {
+	if _, err := h.service.CreateOrder(c.Context(), &order); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not create order"})
 	}
 	return c.Status(fiber.StatusCreated).JSON(order)

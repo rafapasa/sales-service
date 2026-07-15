@@ -14,11 +14,11 @@ import (
 	fiberlogger "github.com/gofiber/fiber/v2/middleware/logger"
 	fiberrecover "github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/joho/godotenv"
-	"github.com/rafapasa/sales-service/config"
-	"github.com/rafapasa/sales-service/database"
-	"github.com/rafapasa/sales-service/handlers"
-	"github.com/rafapasa/sales-service/repository"
-	"github.com/rafapasa/sales-service/services"
+	"github.com/rafapasa/sales-service/internal/application/services"
+	"github.com/rafapasa/sales-service/internal/config"
+	"github.com/rafapasa/sales-service/internal/infrastructure/database"
+	"github.com/rafapasa/sales-service/internal/infrastructure/messaging"
+	"github.com/rafapasa/sales-service/internal/interfaces/http/handlers"
 )
 
 func main() {
@@ -37,17 +37,28 @@ func main() {
 	}
 	defer database.CloseDB()
 
+	// Conectar RabbitMQ
+	publisher, err := messaging.NewRabbitMQPublisher(
+		cfg.RabbitMQURI,
+		"sales.events",
+	)
+
+	if err != nil {
+		log.Fatalf("Erro ao conectar ao RabbitMQ: %v", err)
+	}
+	defer publisher.Close()
+
 	// Inicializar dependências
-	customerRepo := repository.NewCustomerRepository(db)
+	customerRepo := database.NewCustomerRepository(db)
 	customerService := services.NewCustomerService(customerRepo)
 	customerHandler := handlers.NewCustomerHandler(customerService)
 
-	productRepo := repository.NewProductRepository(db)
+	productRepo := database.NewProductRepository(db)
 	productService := services.NewProductService(productRepo)
 	productHandler := handlers.NewProductHandler(productService)
 
-	orderRepo := repository.NewOrderRepository(db)
-	orderService := services.NewOrderService(orderRepo)
+	orderRepo := database.NewOrderRepository(db)
+	orderService := services.NewOrderService(orderRepo, publisher)
 	orderHandler := handlers.NewOrderHandler(orderService)
 
 	// Configurar rotas

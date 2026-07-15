@@ -2,8 +2,8 @@ package handlers
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/rafapasa/sales-service/models"   // Assuming models is correct
-	"github.com/rafapasa/sales-service/services" // Corrected import path
+	"github.com/rafapasa/sales-service/internal/application/services"
+	"github.com/rafapasa/sales-service/internal/domain/models"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
