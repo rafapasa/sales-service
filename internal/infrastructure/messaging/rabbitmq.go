@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"log"
+	"net/http"
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -39,37 +41,20 @@ func (p *RabbitMQPublisher) connect() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	// 1. Inicia métricas
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		log.Fatal(http.ListenAndServe(":8080", nil))
+	}()
+
 	log.Println("🔌 Tentando conectar ao RabbitMQ...")
 	conn, err := amqp.Dial(p.connString)
 	if err != nil {
 		return err
 	}
+	defer conn.Close()
 
-	ch, err := conn.Channel()
-	if err != nil {
-		return err
-	}
 
-	err = ch.ExchangeDeclare(
-		p.exchange,
-		"topic",
-		true,
-		false,
-		false,
-		false,
-		nil,
-	)
-	if err != nil {
-		return err
-	}
-
-	p.conn = conn
-	p.channel = ch
-	p.isConnected = true
-	p.notifyClose = make(chan *amqp.Error)
-	p.conn.NotifyClose(p.notifyClose)
-
-	log.Println("✅ Conectado ao RabbitMQ com sucesso!")
 	return nil
 }
 

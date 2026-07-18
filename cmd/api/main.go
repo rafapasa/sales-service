@@ -11,8 +11,8 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	fiberlogger "github.com/gofiber/fiber/v2/middleware/logger"
-	fiberrecover "github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/joho/godotenv"
 	"github.com/rafapasa/sales-service/internal/application/services"
 	"github.com/rafapasa/sales-service/internal/config"
@@ -33,22 +33,18 @@ func main() {
 	// Conectar ao MongoDB
 	db, err := database.ConnectDB(cfg.MongoDBURI, cfg.MongoDBDatabase)
 	if err != nil {
-		log.Fatalf("Erro ao conectar ao MongoDB: %v", err)
+		log.Fatalf("❌ Erro ao conectar ao MongoDB: %v", err)
 	}
 	defer database.CloseDB()
 
-	// Conectar RabbitMQ
-	publisher, err := messaging.NewRabbitMQPublisher(
-		cfg.RabbitMQURI,
-		"sales.events",
-	)
-
+	// ===== CONFIGURAÇÃO DO RABBITMQ =====
+	publisher, err := messaging.NewSalesPublisher(cfg.RabbitMQURI)
 	if err != nil {
-		log.Fatalf("Erro ao conectar ao RabbitMQ: %v", err)
+		log.Fatalf("❌ Erro ao configurar RabbitMQ: %v", err)
 	}
-	defer publisher.Close()
+	log.Println("✅ RabbitMQ configurado com sucesso!")
 
-	// Inicializar dependências
+	// ===== INICIALIZAR DEPENDÊNCIAS =====
 	customerRepo := database.NewCustomerRepository(db)
 	customerService := services.NewCustomerService(customerRepo)
 	customerHandler := handlers.NewCustomerHandler(customerService)
@@ -58,24 +54,17 @@ func main() {
 	productHandler := handlers.NewProductHandler(productService)
 
 	orderRepo := database.NewOrderRepository(db)
-	orderService := services.NewOrderService(orderRepo, publisher)
+	orderService := services.NewOrderService(orderRepo, publisher) // ✅ Passa o publisher
 	orderHandler := handlers.NewOrderHandler(orderService)
 
-	// Configurar rotas
-
-	// Criar servidor
-	// Criar app Fiber
+	// ===== CONFIGURAÇÃO DO FIBER =====
 	app := fiber.New(fiber.Config{
-		AppName:      "GopherStore",
+		AppName:      "GopherStore - Sales Service",
 		ServerHeader: "Fiber",
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
-		// Error handler customizado
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
-			// Log do erro
-			log.Printf("Erro: %v", err)
-
-			// Retornar erro em JSON
+			log.Printf("❌ Erro: %v", err)
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"success": false,
 				"error":   err.Error(),
@@ -83,11 +72,11 @@ func main() {
 		},
 	})
 
-	// Middlewares globais
-	app.Use(fiberlogger.New(fiberlogger.Config{
+	// Middlewares
+	app.Use(logger.New(logger.Config{
 		Format: "[${time}] ${status} - ${latency} ${method} ${path}\n",
 	}))
-	app.Use(fiberrecover.New())
+	app.Use(recover.New())
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: "*",
 		AllowMethods: "GET,POST,PUT,DELETE,OPTIONS",
@@ -97,17 +86,19 @@ func main() {
 	// Health check
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
-			"status": "ok",
-			"time":   time.Now().Format(time.RFC3339),
+			"status":  "ok",
+			"service": "sales-service",
+			"time":    time.Now().Format(time.RFC3339),
 		})
 	})
 
-	// Grupo de rotas da API
+	// ===== ROTAS =====
 	api := app.Group("/api/v1")
 
 	api.Get("/ping", func(c *fiber.Ctx) error {
 		return c.SendString("pong")
 	})
+
 	// Rotas de Cliente
 	api.Post("/customers", customerHandler.CreateCustomer)
 	api.Get("/customers", customerHandler.GetAllCustomers)
@@ -126,27 +117,28 @@ func main() {
 	api.Post("/orders", orderHandler.CreateOrder)
 	api.Get("/orders", orderHandler.GetAllOrders)
 	api.Get("/orders/:id", orderHandler.GetOrderByID)
+	// api.Put("/orders/:id/status", orderHandler.UpdateOrderStatus)
+	// api.Post("/orders/:id/cancel", orderHandler.CancelOrder)
 
-	// Iniciar servidor em goroutine
+	// ===== INICIAR SERVIDOR =====
 	go func() {
 		log.Printf("🚀 Servidor Fiber iniciado na porta %s", cfg.ServerPort)
 		if err := app.Listen(fmt.Sprintf(":%s", cfg.ServerPort)); err != nil {
-			log.Fatalf("Erro ao iniciar servidor: %v", err)
+			log.Fatalf("❌ Erro ao iniciar servidor: %v", err)
 		}
 	}()
 
-	// Graceful shutdown
+	// ===== GRACEFUL SHUTDOWN =====
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	log.Println("📴 Desligando servidor...")
 
-	// Shutdown com timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := app.ShutdownWithContext(ctx); err != nil {
-		log.Fatalf("Erro ao desligar servidor: %v", err)
+		log.Printf("❌ Erro ao desligar servidor: %v", err)
 	}
 
 	log.Println("✅ Servidor desligado com sucesso")

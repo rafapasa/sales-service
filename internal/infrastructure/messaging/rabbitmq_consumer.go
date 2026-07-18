@@ -11,16 +11,16 @@ import (
 type MessageHandler func(ctx context.Context, body []byte) error
 
 type RabbitMQConsumer struct {
-	connString   string
-	exchange     string
-	queueName    string
-	routingKey   string
-	handler      MessageHandler
-	conn         *amqp.Connection
-	channel      *amqp.Channel
-	done         chan bool
-	notifyClose  chan *amqp.Error
-	isConsuming  bool
+	connString  string
+	exchange    string
+	queueName   string
+	routingKey  string
+	handler     MessageHandler
+	conn        *amqp.Connection
+	channel     *amqp.Channel
+	done        chan bool
+	notifyClose chan *amqp.Error
+	isConsuming bool
 }
 
 func NewRabbitMQConsumer(connString, exchange, queueName, routingKey string, handler MessageHandler) (*RabbitMQConsumer, error) {

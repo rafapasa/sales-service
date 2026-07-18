@@ -12,33 +12,19 @@ import (
 
 type OrderService struct {
 	repo      *database.OrderRepository
-	publisher *messaging.RabbitMQPublisher
+	publisher *messaging.SalesPublisher
 }
 
-func NewOrderService(repo *database.OrderRepository, publisher *messaging.RabbitMQPublisher) *OrderService {
+func NewOrderService(repo *database.OrderRepository, publisher *messaging.SalesPublisher) *OrderService {
 	return &OrderService{repo: repo,
 		publisher: publisher}
 }
 
 // EnqueueOrder apenas publica o pedido recebido para processamento assíncrono.
 func (s *OrderService) EnqueueOrder(ctx context.Context, order *models.Order) (string, error) {
-	const eventType = "order.received.v1"
-
-	// Criar envelope
-	envelope, err := messaging.NewMessageEnvelope(eventType, order)
-	if err != nil {
-		log.Printf("❌ Erro ao criar envelope: %v", err)
-		return "", err
-	}
-
 	// Publicar no RabbitMQ
-	body, err := envelope.ToJSON()
+	envelope, err := s.publisher.PublishOrderCreated(ctx, order)
 	if err != nil {
-		log.Printf("❌ Erro ao serializar evento: %v", err)
-		return "", err
-	}
-
-	if err := s.publisher.Publish(ctx, eventType, body); err != nil {
 		log.Printf("❌ Erro ao publicar evento: %v", err)
 		return "", err
 	}
