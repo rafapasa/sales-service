@@ -7,6 +7,7 @@ import (
 
 	"github.com/rafapasa/rabbitmq-common/client"
 	"github.com/rafapasa/rabbitmq-common/queue"
+	"github.com/rafapasa/sales-service/internal/domain/events"
 	"github.com/rafapasa/sales-service/internal/domain/models"
 )
 
@@ -22,13 +23,13 @@ func NewSalesPublisher(connString string) (*SalesPublisher, error) {
 	queueManager := SetupQueueManager()
 
 	// 2. Conecta ao RabbitMQ
-	conn, err := ConnectRabbitMQ(connString)
-	if err != nil {
+	conn := GetConnectionManager(connString)
+	if err := conn.Connect(); err != nil {
 		return nil, err
 	}
 
 	// 3. Cria o publisher genérico
-	publisher, err := client.NewPublisher(conn, queueManager)
+	publisher, err := client.NewPublisher(conn.conn, queueManager)
 	if err != nil {
 		return nil, err
 	}
@@ -39,14 +40,21 @@ func NewSalesPublisher(connString string) (*SalesPublisher, error) {
 	}, nil
 }
 
-// PublishOrderCreated publica um evento de pedido criado
-func (p *SalesPublisher) PublishOrderCreated(ctx context.Context, order *models.Order) (*MessageEnvelope, error) {
-	const eventType = "order.received.v1"
-
-	// Criar envelope
-	envelope, err := NewMessageEnvelope(eventType, order)
+func (p *SalesPublisher) builerMessageEnvelope(eventType string, payload interface{}) (*events.MessageEnvelope, error) {
+	envelope, err := events.NewMessageEnvelope(eventType, payload)
 	if err != nil {
 		log.Printf("❌ Erro ao criar envelope: %v", err)
+		return nil, err
+	}
+	return envelope, nil
+	//}
+}
+
+// PublishOrderCreated publica um evento de pedido criado
+func (p *SalesPublisher) PublishOrderCreated(ctx context.Context, order *models.Order) (*events.MessageEnvelope, error) {
+	// Criar envelope
+	envelope, err := p.builerMessageEnvelope(events.EventOrderCreated, order)
+	if err != nil {
 		return nil, err
 	}
 
@@ -62,39 +70,42 @@ func (p *SalesPublisher) PublishOrderCreated(ctx context.Context, order *models.
 }
 
 // PublishOrderUpdated publica um evento de pedido atualizado
-func (p *SalesPublisher) PublishOrderUpdated(ctx context.Context, order OrderUpdatedEvent) error {
-	body, err := json.Marshal(order)
+func (p *SalesPublisher) PublishOrderUpdated(ctx context.Context, order *models.Order) (*events.MessageEnvelope, error) {
+	envelope, err := p.builerMessageEnvelope(events.EventOrderUpdated, order)
 	if err != nil {
-		return err
+		return nil, err
+	}
+	body, err := json.Marshal(envelope)
+	if err != nil {
+		return nil, err
 	}
 
-	log.Printf("📤 Publicando pedido atualizado: %s", order.OrderID)
-	return p.publisher.Publish(ctx, RoutingKeyOrderUpdated, body)
+	log.Printf("📤 Publicando pedido atualizado: %s", order.Id)
+	return envelope, p.publisher.Publish(ctx, RoutingKeyOrderUpdated, body)
 }
 
 // PublishOrderCanceled publica um evento de pedido cancelado
-func (p *SalesPublisher) PublishOrderCanceled(ctx context.Context, order OrderCanceledEvent) error {
-	body, err := json.Marshal(order)
+func (p *SalesPublisher) PublishOrderCanceled(ctx context.Context, order *models.Order) (*events.MessageEnvelope, error) {
+	envelope, err := p.builerMessageEnvelope(events.EventOrderCancelled, order)
 	if err != nil {
-		return err
+		return nil, err
+	}
+	body, err := json.Marshal(envelope)
+	if err != nil {
+		return nil, err
 	}
 
-	log.Printf("📤 Publicando pedido cancelado: %s", order.OrderID)
-	return p.publisher.Publish(ctx, RoutingKeyOrderCanceled, body)
+	log.Printf("📤 Publicando pedido cancelado: %s", order.Id)
+	return envelope, p.publisher.Publish(ctx, RoutingKeyOrderCanceled, body)
 }
 
-// PublishPaymentProcessed publica um evento de pagamento processado
-func (p *SalesPublisher) PublishPaymentProcessed(ctx context.Context, payment PaymentProcessedEvent) error {
-	body, err := json.Marshal(payment)
-	if err != nil {
-		return err
-	}
+// // PublishPaymentProcessed publica um evento de pagamento processado
+// func (p *SalesPublisher) PublishPaymentProcessed(ctx context.Context, payment PaymentProcessedEvent) error {
+// 	body, err := json.Marshal(payment)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	log.Printf("📤 Publicando pagamento processado: %s", payment.PaymentID)
-	return p.publisher.Publish(ctx, RoutingKeyPaymentProcessed, body)
-}
-
-// Close fecha a conexão (opcional, a conexão é gerenciada globalmente)
-func (p *SalesPublisher) Close() error {
-	return nil
-}
+// 	log.Printf("📤 Publicando pagamento processado: %s", payment.PaymentID)
+// 	return p.publisher.Publish(ctx, RoutingKeyPaymentProcessed, body)
+// }

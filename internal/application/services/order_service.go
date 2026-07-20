@@ -41,10 +41,27 @@ func (s *OrderService) GetOrderByID(id primitive.ObjectID) (*models.Order, error
 	return s.repo.GetByID(id)
 }
 
-func (s *OrderService) UpdateOrder(id primitive.ObjectID, order *models.Order) error {
-	return s.repo.Update(id, order)
+func (s *OrderService) UpdateOrder(ctx context.Context, id primitive.ObjectID, order *models.Order) error {
+	// Publicar no RabbitMQ
+	order.Id = id
+	_, err := s.publisher.PublishOrderUpdated(ctx, order)
+	if err != nil {
+		log.Printf("❌ Erro ao publicar evento: %v", err)
+		return err
+	}
+
+	log.Printf("✅ Pedido de atualização enfileirado para processamento. OrderID: %s", id)
+	return nil
 }
 
-func (s *OrderService) DeleteOrder(id primitive.ObjectID) error {
-	return s.repo.Delete(id)
+func (s *OrderService) DeleteOrder(ctx context.Context, id primitive.ObjectID) error {
+	// Publicar no RabbitMQ
+	_, err := s.publisher.PublishOrderCanceled(ctx, &models.Order{Id: id})
+	if err != nil {
+		log.Printf("❌ Erro ao publicar evento: %v", err)
+		return err
+	}
+
+	log.Printf("✅ Pedido de cancelamento enfileirado para processamento. OrderID: %s", id)
+	return nil
 }

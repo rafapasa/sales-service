@@ -22,7 +22,7 @@ func (h *OrderHandler) CreateOrder(c *fiber.Ctx) error {
 	}
 
 	// A lógica agora é apenas enfileirar o pedido
-	correlationID, err := h.service.EnqueueOrder(c.Context(), &req)
+	correlationID, err := h.service.EnqueueOrder(c.Context(), &req) // Garante que está chamando EnqueueOrder
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}

@@ -8,74 +8,126 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-var (
-	conn     *amqp.Connection
-	connMu   sync.RWMutex
-	connOnce sync.Once
-)
-
-// ConnectRabbitMQ estabelece conexão com RabbitMQ com reconexão automática
-func ConnectRabbitMQ(connString string) (*amqp.Connection, error) {
-	connOnce.Do(func() {
-		log.Println("🔌 Conectando ao RabbitMQ...")
-
-		var err error
-		conn, err = amqp.Dial(connString)
-		if err != nil {
-			log.Printf("❌ Falha na conexão inicial: %v", err)
-			return
-		}
-
-		// Monitora perda de conexão
-		go monitorConnection(conn, connString)
-	})
-
-	connMu.RLock()
-	defer connMu.RUnlock()
-
-	if conn == nil || conn.IsClosed() {
-		return nil, ErrNotConnected
-	}
-
-	return conn, nil
+// ConnectionManager gerencia a conexão com RabbitMQ
+type ConnectionManager struct {
+	conn       *amqp.Connection
+	connString string
+	mu         sync.RWMutex
+	notifyChan chan *amqp.Error
 }
 
-// monitorConnection monitora a conexão e reconecta se necessário
-func monitorConnection(conn *amqp.Connection, connString string) {
-	notifyClose := conn.NotifyClose(make(chan *amqp.Error))
+var (
+	globalManager *ConnectionManager
+	managerOnce   sync.Once
+)
 
+// GetConnectionManager retorna o singleton do gerenciador
+func GetConnectionManager(connString string) *ConnectionManager {
+	managerOnce.Do(func() {
+		globalManager = &ConnectionManager{
+			connString: connString,
+		}
+	})
+	return globalManager
+}
+
+// Connect estabelece ou reestabelece a conexão
+func (cm *ConnectionManager) Connect() error {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	// Se já tem conexão válida, retorna
+	if cm.conn != nil && !cm.conn.IsClosed() {
+		return nil
+	}
+
+	log.Println("🔌 Conectando ao RabbitMQ...")
+
+	conn, err := amqp.Dial(cm.connString)
+	if err != nil {
+		return err
+	}
+
+	cm.conn = conn
+	cm.notifyChan = conn.NotifyClose(make(chan *amqp.Error))
+
+	// Inicia monitoramento
+	go cm.monitorConnection()
+
+	log.Println("✅ Conectado ao RabbitMQ com sucesso")
+	return nil
+}
+
+// GetConnection retorna a conexão ativa
+func (cm *ConnectionManager) GetConnection() (*amqp.Connection, error) {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+
+	if cm.conn == nil || cm.conn.IsClosed() {
+		return nil, &ConnectionError{msg: "conexão não está ativa"}
+	}
+
+	return cm.conn, nil
+}
+
+// GetChannel cria um canal ativo
+func (cm *ConnectionManager) GetChannel() (*amqp.Channel, error) {
+	// Primeiro, tenta pegar a conexão
+	conn, err := cm.GetConnection()
+	if err != nil {
+		// Tenta reconectar
+		if err := cm.Connect(); err != nil {
+			return nil, err
+		}
+		conn, _ = cm.GetConnection()
+	}
+
+	// Tenta abrir canal
+	ch, err := conn.Channel()
+	if err != nil {
+		// Se falhar, tenta reconectar
+		if err := cm.Connect(); err != nil {
+			return nil, err
+		}
+		conn, _ = cm.GetConnection()
+		return conn.Channel()
+	}
+
+	return ch, nil
+}
+
+// monitorConnection monitora perda de conexão
+func (cm *ConnectionManager) monitorConnection() {
 	for {
-		err := <-notifyClose
+		err := <-cm.notifyChan
 		if err != nil {
-			log.Printf("⚠️ Conexão RabbitMQ perdida: %v. Tentando reconectar...", err)
+			log.Printf("⚠️ Conexão RabbitMQ perdida: %v", err)
 
-			connMu.Lock()
-			conn = nil
-			connMu.Unlock()
+			cm.mu.Lock()
+			cm.conn = nil
+			cm.mu.Unlock()
 
-			// Tenta reconectar com backoff
+			// Tenta reconectar automaticamente
 			for {
 				time.Sleep(5 * time.Second)
-				newConn, err := amqp.Dial(connString)
-				if err == nil {
-					connMu.Lock()
-					conn = newConn
-					connMu.Unlock()
-
-					// Reinicia o monitoramento
-					notifyClose = conn.NotifyClose(make(chan *amqp.Error))
-					log.Println("✅ Reconectado ao RabbitMQ com sucesso!")
+				if err := cm.Connect(); err == nil {
+					log.Println("✅ Reconectado com sucesso!")
 					break
 				}
-				log.Printf("❌ Falha na reconexão: %v. Tentando novamente em 5s", err)
+				log.Printf("❌ Falha na reconexão: %v", err)
 			}
 		}
 	}
 }
 
-// ErrNotConnected erro de conexão
-var ErrNotConnected = &ConnectionError{msg: "não conectado ao RabbitMQ"}
+// IsConnected verifica se está conectado
+func (cm *ConnectionManager) IsConnected() bool {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+	return cm.conn != nil && !cm.conn.IsClosed()
+}
 
+// ConnectionError erro de conexão
 type ConnectionError struct {
 	msg string
 }

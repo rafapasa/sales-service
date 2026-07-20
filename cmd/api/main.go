@@ -83,20 +83,37 @@ func main() {
 		AllowHeaders: "Content-Type,Authorization",
 	}))
 
-	// Health check
-	app.Get("/health", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
-			"status":  "ok",
-			"service": "sales-service",
-			"time":    time.Now().Format(time.RFC3339),
-		})
-	})
-
 	// ===== ROTAS =====
 	api := app.Group("/api/v1")
 
 	api.Get("/ping", func(c *fiber.Ctx) error {
 		return c.SendString("pong")
+	})
+	// ===== ROTA DE HEALTH CHECK COM RABBITMQ =====
+	app.Get("/health", func(c *fiber.Ctx) error {
+		health := fiber.Map{
+			"status":  "ok",
+			"service": "sales-service",
+			"time":    time.Now().Format(time.RFC3339),
+		}
+		checker := messaging.NewHealthChecker(messaging.GetConnectionManager(cfg.RabbitMQURI))
+		// Verifica RabbitMQ
+		if checker != nil {
+			if status, err := checker.CheckHealth(); err != nil {
+				health["rabbitmq"] = fiber.Map{
+					"status": status,
+					"error":  err.Error(),
+				}
+				// Retorna status 503 se RabbitMQ estiver com problema
+				return c.Status(fiber.StatusServiceUnavailable).JSON(health)
+			} else {
+				health["rabbitmq"] = fiber.Map{
+					"status": status,
+				}
+			}
+		}
+
+		return c.JSON(health)
 	})
 
 	// Rotas de Cliente
