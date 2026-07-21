@@ -51,10 +51,10 @@ github.com/prometheus/procfs v0.16.1 h1:hZ15bTNuirocR6u0JZ6BAHHmwS1p8B4P6MRqxtzM
 github.com/prometheus/procfs v0.16.1/go.mod h1:teAbpZRB1iIAJYREa1LsoWUXykVXA1KlTmWl8x/U+Is=
 github.com/rabbitmq/amqp091-go v1.12.0 h1:V0v14Iqfs+MwHWihJt/nGS5Ulu0vw572b2Co3mwunkI=
 github.com/rabbitmq/amqp091-go v1.12.0/go.mod h1:Hy4jKW5kQART1u+JkDTF9YYOQUHXqMuhrgxOEeS7G4o=
-github.com/rafapasa/rabbitmq-common v0.0.0-20260719122844-4f0440758619 h1:E7omnAc36iXdUEhbU/drZ5UlL4vjB4QjQ06D2tNgg9k=
-github.com/rafapasa/rabbitmq-common v0.0.0-20260719122844-4f0440758619/go.mod h1:n5X0pCxOS2wuTXboSvnzfVaX95R/vqb23niF5FF2FUc=
-github.com/rafapasa/rabbitmq-common v0.0.0-20260720144054-ecfd5f89d4a7 h1:UueVMstIwb37uCXbAvvfmsaKoVZbPfo0PLm5jWuPNbs=
-github.com/rafapasa/rabbitmq-common v0.0.0-20260720144054-ecfd5f89d4a7/go.mod h1:n5X0pCxOS2wuTXboSvnzfVaX95R/vqb23niF5FF2FUc=
+github.com/rafapasa/rabbitmq-common v0.0.0-20260720215707-0b775ff25f16 h1:sN/XA3fom35kMYlLLQE+SG5zuc1ySfHbS2ZmXtydVDg=
+github.com/rafapasa/rabbitmq-common v0.0.0-20260720215707-0b775ff25f16/go.mod h1:n5X0pCxOS2wuTXboSvnzfVaX95R/vqb23niF5FF2FUc=
+github.com/rafapasa/rabbitmq-common v0.0.0-20260721125537-e5e0edb5e9f4 h1:KgXT7Yj1Jkw0iX4xQiGG1+apB/UtWF2Nf4RLQ4UM03U=
+github.com/rafapasa/rabbitmq-common v0.0.0-20260721125537-e5e0edb5e9f4/go.mod h1:JKRZgy6aDRE1yqEsIoDlS11HCZMnkyNlOfW5j9UvtdY=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=
 github.com/rogpeppe/go-internal v1.14.1/go.mod h1:MaRKkUm5W0goXpeCfT7UZI6fk/L7L7so1lCWt35ZSgc=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=

@@ -14,6 +14,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/joho/godotenv"
+	"github.com/rafapasa/rabbitmq-common/client"
 	"github.com/rafapasa/sales-service/internal/application/services"
 	"github.com/rafapasa/sales-service/internal/config"
 	"github.com/rafapasa/sales-service/internal/infrastructure/database"
@@ -37,8 +38,11 @@ func main() {
 	}
 	defer database.CloseDB()
 
+	// 1. Criar o ConnectionManager (uma vez por aplicação)
+	connManager, err := client.NewConnectionManager(cfg.RabbitMQURI)
+
 	// ===== CONFIGURAÇÃO DO RABBITMQ =====
-	publisher, err := messaging.NewSalesPublisher(cfg.RabbitMQURI)
+	publisher, err := messaging.NewSalesPublisher(connManager)
 	if err != nil {
 		log.Fatalf("❌ Erro ao configurar RabbitMQ: %v", err)
 	}
@@ -96,7 +100,7 @@ func main() {
 			"service": "sales-service",
 			"time":    time.Now().Format(time.RFC3339),
 		}
-		checker := messaging.NewHealthChecker(messaging.GetConnectionManager(cfg.RabbitMQURI))
+		checker := messaging.NewHealthChecker(connManager)
 		// Verifica RabbitMQ
 		if checker != nil {
 			if status, err := checker.CheckHealth(); err != nil {

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/rafapasa/rabbitmq-common/client"
 	"github.com/rafapasa/sales-service/internal/application/processors"
 	"github.com/rafapasa/sales-service/internal/config"
 	"github.com/rafapasa/sales-service/internal/infrastructure/database"
@@ -44,8 +45,14 @@ func main() {
 	}
 	defer database.CloseDB()
 
+	connManager, err := client.NewConnectionManager(cfg.RabbitMQURI)
+	if err != nil {
+		// O NewConnectionManager agora não retorna erro fatal, apenas loga.
+		// A aplicação pode continuar e o manager tentará reconectar.
+	}
+
 	// ===== INICIALIZAR RABBITMQ CONSUMER =====
-	consumer, err := messaging.NewSalesConsumer(cfg.RabbitMQURI)
+	consumer, err := messaging.NewSalesConsumer(connManager)
 	if err != nil {
 		log.Fatalf("❌ Erro ao configurar RabbitMQ Consumer: %v", err)
 	}
@@ -56,8 +63,13 @@ func main() {
 
 	// ===== INICIAR CONSUMO =====
 	// Consumir eventos de pedidos
+	// A função StartConsumingOrders é bloqueante, então a executamos em uma goroutine
+	// para não travar o graceful shutdown.
 	go func() {
-		consumer.StartConsumingOrders(orderProcessor)
+		log.Println("Iniciando consumidor de pedidos...")
+		if err := consumer.StartConsumingOrders(orderProcessor); err != nil {
+			log.Fatalf("❌ Erro fatal ao iniciar o consumidor de pedidos: %v", err)
+		}
 	}()
 
 	// Consumir eventos de pagamentos
@@ -79,6 +91,7 @@ func main() {
 	// Aguarda processamento finalizar
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	consumer.Shutdown()
 
 	// Aqui você pode adicionar lógica para finalizar processamentos pendentes
 	<-ctx.Done()

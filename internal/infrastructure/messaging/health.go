@@ -1,20 +1,23 @@
 package messaging
 
 import (
+	"errors"
 	"sync"
 	"time"
+
+	"github.com/rafapasa/rabbitmq-common/client"
 )
 
 // HealthChecker verifica a saúde da conexão RabbitMQ
 type HealthChecker struct {
-	connManager *ConnectionManager
+	connManager client.ConnectionManager
 	lastCheck   time.Time
 	status      string
 	mu          sync.RWMutex
 }
 
 // NewHealthChecker cria um novo checker
-func NewHealthChecker(connManager *ConnectionManager) *HealthChecker {
+func NewHealthChecker(connManager client.ConnectionManager) *HealthChecker {
 	return &HealthChecker{
 		connManager: connManager,
 		status:      "unknown",
@@ -30,7 +33,7 @@ func (h *HealthChecker) CheckHealth() (string, error) {
 
 	if !h.connManager.IsConnected() {
 		h.status = "unhealthy"
-		return h.status, &ConnectionError{msg: "conexão perdida"}
+		return h.status, errors.New("conexão perdida")
 	}
 
 	// Tenta abrir um canal para testar

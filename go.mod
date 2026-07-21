@@ -5,7 +5,7 @@ go 1.25.1
 require (
 	github.com/joho/godotenv v1.5.1
 	github.com/rabbitmq/amqp091-go v1.12.0
-	github.com/rafapasa/rabbitmq-common v0.0.0-20260720144054-ecfd5f89d4a7
+	github.com/rafapasa/rabbitmq-common v0.0.0-20260721125537-e5e0edb5e9f4
 )
 
 require (

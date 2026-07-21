@@ -18,18 +18,12 @@ type SalesPublisher struct {
 }
 
 // NewSalesPublisher cria um novo publisher para o sales-service
-func NewSalesPublisher(connString string) (*SalesPublisher, error) {
+func NewSalesPublisher(connectionManager client.ConnectionManager) (*SalesPublisher, error) {
 	// 1. Configura o gerenciador de filas
-	queueManager := SetupQueueManager()
-
-	// 2. Conecta ao RabbitMQ
-	conn := GetConnectionManager(connString)
-	if err := conn.Connect(); err != nil {
-		return nil, err
-	}
+	queueManager := SetupQueueManager() // Corretamente busca a configuração do serviço
 
 	// 3. Cria o publisher genérico
-	publisher, err := client.NewPublisher(conn.conn, queueManager)
+	publisher, err := client.NewPublisher(connectionManager, queueManager)
 	if err != nil {
 		return nil, err
 	}
@@ -40,63 +34,39 @@ func NewSalesPublisher(connString string) (*SalesPublisher, error) {
 	}, nil
 }
 
-func (p *SalesPublisher) builerMessageEnvelope(eventType string, payload interface{}) (*events.MessageEnvelope, error) {
+func (p *SalesPublisher) publish(ctx context.Context, eventType, routingKey string, payload interface{}) (*events.MessageEnvelope, error) {
 	envelope, err := events.NewMessageEnvelope(eventType, payload)
 	if err != nil {
 		log.Printf("❌ Erro ao criar envelope: %v", err)
 		return nil, err
 	}
-	return envelope, nil
-	//}
+
+	body, err := json.Marshal(envelope)
+	if err != nil {
+		log.Printf("❌ Erro ao serializar envelope: %v", err)
+		return nil, err
+	}
+
+	log.Printf("📤 Publicando evento '%s' para a routing key '%s'", eventType, routingKey)
+	return envelope, p.publisher.Publish(ctx, routingKey, body)
 }
 
 // PublishOrderCreated publica um evento de pedido criado
 func (p *SalesPublisher) PublishOrderCreated(ctx context.Context, order *models.Order) (*events.MessageEnvelope, error) {
-	// Criar envelope
-	envelope, err := p.builerMessageEnvelope(events.EventOrderCreated, order)
-	if err != nil {
-		return nil, err
-	}
-
-	log.Printf("📤 Publicando pedido criado: %s", order.Id) // Use order.ID if that's the correct field
-	body, err := json.Marshal(envelope)
-	if err != nil {
-		return nil, err
-	}
-
-	// The log below is problematic as envelope.Payload is json.RawMessage, not OrderCreatedEvent directly
-	// log.Printf("📤 Publicando pedido criado: %s", &envelope.Payload.(OrderCreatedEvent).OrderID)
-	return envelope, p.publisher.Publish(ctx, RoutingKeyOrderCreated, body)
+	log.Printf("Publicando criação do pedido: %s", order.Id)
+	return p.publish(ctx, events.EventOrderCreated, RoutingKeyOrderCreated, order)
 }
 
 // PublishOrderUpdated publica um evento de pedido atualizado
 func (p *SalesPublisher) PublishOrderUpdated(ctx context.Context, order *models.Order) (*events.MessageEnvelope, error) {
-	envelope, err := p.builerMessageEnvelope(events.EventOrderUpdated, order)
-	if err != nil {
-		return nil, err
-	}
-	body, err := json.Marshal(envelope)
-	if err != nil {
-		return nil, err
-	}
-
-	log.Printf("📤 Publicando pedido atualizado: %s", order.Id)
-	return envelope, p.publisher.Publish(ctx, RoutingKeyOrderUpdated, body)
+	log.Printf("Publicando atualização do pedido: %s", order.Id)
+	return p.publish(ctx, events.EventOrderUpdated, RoutingKeyOrderUpdated, order)
 }
 
 // PublishOrderCanceled publica um evento de pedido cancelado
 func (p *SalesPublisher) PublishOrderCanceled(ctx context.Context, order *models.Order) (*events.MessageEnvelope, error) {
-	envelope, err := p.builerMessageEnvelope(events.EventOrderCancelled, order)
-	if err != nil {
-		return nil, err
-	}
-	body, err := json.Marshal(envelope)
-	if err != nil {
-		return nil, err
-	}
-
-	log.Printf("📤 Publicando pedido cancelado: %s", order.Id)
-	return envelope, p.publisher.Publish(ctx, RoutingKeyOrderCanceled, body)
+	log.Printf("Publicando cancelamento do pedido: %s", order.Id)
+	return p.publish(ctx, events.EventOrderCancelled, RoutingKeyOrderCanceled, order)
 }
 
 // // PublishPaymentProcessed publica um evento de pagamento processado
